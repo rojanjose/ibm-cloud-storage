@@ -44,19 +44,22 @@ bitnami   	https://charts.bitnami.com/bitnami
 iks-charts	https://icr.io/helm/iks-charts
 ```
 
-## Install Mongodb
+## Mongodb with block storage
+
+### Install manifests
 
 Pick values from [value.yaml](https://raw.githubusercontent.com/helm/charts/master/stable/mongodb/values.yaml)
 Installed in `standalone` mode.
 Dryrun: 
-```
-helm install mongo bitnami/mongodb --debug --dry-run > mongdb-install-dryrun.yaml
-```
 
+TODO: fix security content values for OpenShift.
+```
+helm install mongo bitnami/mongodb --set podSecurityContext.fsGroup=1001020000,containerSecurityContext.runAsUser=1001020000 --debug --dry-run > mongdb-install-dryrun.yaml
+
+```
 View the output of the command. Review the section that manifests PVC provisioing. 
 Spec list only parameters, Access mode `RWO` and storage size `8gi`.
 Defualt values are assumed for remaining parmeters such as storage class, ... 
-
 
 ```
 # Source: mongodb/templates/standalone/pvc.yaml
@@ -79,9 +82,113 @@ spec:
       storage: "8Gi"
 ```
 
+### Install Mongodb
+
+TODO: fix security content values for OpenShift.
+```
+helm install mongo bitnami/mongodb --set podSecurityContext.fsGroup=1001020000,containerSecurityContext.runAsUser=1001020000 --debug
+```
+
+Expected output:
+```
+$ helm install mongo bitnami/mongodb --set podSecurityContext.fsGroup=1001020000,containerSecurityContext.runAsUser=1001020000 --debug
+
+install.go:159: [debug] Original chart version: ""
+install.go:176: [debug] CHART PATH: /Users/rojan/Library/Caches/helm/repository/mongodb-9.2.4.tgz
+
+client.go:108: [debug] creating 5 resource(s)
+NAME: mongo
+LAST DEPLOYED: Thu Oct 15 12:49:06 2020
+NAMESPACE: mongo-user001
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+USER-SUPPLIED VALUES:
+containerSecurityContext:
+  runAsUser: 1001020000
+podSecurityContext:
+  fsGroup: 1001020000
+
+......
+
+```
+
+View the objects being created by the helm chart.
+
+```
+$ oc get all 
+NAME                    TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)     AGE
+service/mongo-mongodb   ClusterIP   172.21.242.70   <none>        27017/TCP   17s
+
+NAME                            READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/mongo-mongodb   0/1     0            0           17s
+
+NAME                                       DESIRED   CURRENT   READY   AGE
+replicaset.apps/mongo-mongodb-6f8f7cd789   1         0         0       17s
+```
+
+View the list of persistence volume claims. Note that the `mongo-mongodb` is pending volume allocation.
+
+```
+$ oc get pvc    
+
+NAME            STATUS    VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS      AGE
+mongo-mongodb   Pending                                      ibmc-block-gold   21s
+```
+
+After waiting for some time. The pod supporting Mongodb is in `Running` status.
+
+```
+$ oc get all       
+NAME                                 READY   STATUS    RESTARTS   AGE
+pod/mongo-mongodb-66d7bcd7cf-vqvbj   1/1     Running   0          8m37s
+
+NAME                    TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)     AGE
+service/mongo-mongodb   ClusterIP   172.21.242.70   <none>        27017/TCP   12m
+
+NAME                            READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/mongo-mongodb   1/1     1            1           12m
+
+NAME                                       DESIRED   CURRENT   READY   AGE
+replicaset.apps/mongo-mongodb-66d7bcd7cf   1         1         1       8m37s
+replicaset.apps/mongo-mongodb-6f8f7cd789   0         0         0       12m
+```
+
+And the PVC `mongo-mongodb` is now bound to volume `pvc-2f423668-4f87-4ae4-8edf-8c892188b645`
+```
+$ oc get pvc 
+NAME            STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS      AGE
+mongo-mongodb   Bound    pvc-2f423668-4f87-4ae4-8edf-8c892188b645   20Gi       RWO            ibmc-block-gold   2m26s
+```
+
+
 ## Accessing data
 
 ### From application
+
+NOTES:
+** Please be patient while the chart is being deployed **
+
+MongoDB can be accessed via port 27017 on the following DNS name(s) from within your cluster:
+
+    mongo-mongodb.mongo-user001.svc.cluster.local
+
+To get the root password run:
+
+    export MONGODB_ROOT_PASSWORD=$(kubectl get secret --namespace mongo-user001 mongo-mongodb -o jsonpath="{.data.mongodb-root-password}" | base64 --decode)
+
+To connect to your database, create a MongoDB client container:
+
+    kubectl run --namespace mongo-user001 mongo-mongodb-client --rm --tty -i --restart='Never' --image docker.io/bitnami/mongodb:4.4.1-debian-10-r13 --command -- bash
+
+Then, run the following command:
+    mongo admin --host "mongo-mongodb" --authenticationDatabase admin -u root -p $MONGODB_ROOT_PASSWORD
+
+To connect to your database from outside the cluster execute the following commands:
+
+    kubectl port-forward --namespace mongo-user001 svc/mongo-mongodb 27017:27017 &
+    mongo --host 127.0.0.1 --authenticationDatabase admin -p $MONGODB_ROOT_PASSWORD
+
 
 ### For cluster
 
