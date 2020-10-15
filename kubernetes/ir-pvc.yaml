@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: image-registry-storage
+  namespace: openshift-image-registry
+  labels:
+    billingType: hourly
+    region: us-south
+    zone: dal10
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: ibmc-file-gold
+  volumeMode: Filesystem
+  volumeName: pvc-d18d13fd-605d-4e00-b6bd-c0beaec69b22

@@ -1,0 +1,339 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    prometheus: k8s
+  name: prometheus-k8s
+  namespace: openshift-monitoring
+spec:
+  podManagementPolicy: Parallel
+  replicas: 2
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: prometheus
+      prometheus: k8s
+  serviceName: prometheus-operated
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: prometheus
+        prometheus: k8s
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: prometheus
+                  operator: In
+                  values:
+                  - k8s
+              namespaces:
+              - openshift-monitoring
+              topologyKey: kubernetes.io/hostname
+            weight: 100
+      containers:
+      - args:
+        - --web.console.templates=/etc/prometheus/consoles
+        - --web.console.libraries=/etc/prometheus/console_libraries
+        - --config.file=/etc/prometheus/config_out/prometheus.env.yaml
+        - --storage.tsdb.path=/prometheus
+        - --storage.tsdb.retention.time=15d
+        - --web.enable-lifecycle
+        - --storage.tsdb.no-lockfile
+        - --web.external-url=https://prometheus-k8s-openshift-monitoring.rj-rhm-sandbox-2bef1f4b4097001da9502000c44fc2b2-0000.us-south.containers.appdomain.cloud/
+        - --web.route-prefix=/
+        - --web.listen-address=127.0.0.1:9090
+        image: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:0e8e1f411a5ef15377672721e1fcf14882f5be4970a2acc1ba228e3f7d2330ef
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - if [ -x "$(command -v curl)" ]; then curl http://localhost:9090/-/healthy;
+              elif [ -x "$(command -v wget)" ]; then wget -q -O /dev/null http://localhost:9090/-/healthy;
+              else exit 1; fi
+          failureThreshold: 6
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        name: prometheus
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - if [ -x "$(command -v curl)" ]; then curl http://localhost:9090/-/ready;
+              elif [ -x "$(command -v wget)" ]; then wget -q -O /dev/null http://localhost:9090/-/ready;
+              else exit 1; fi
+          failureThreshold: 120
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        resources:
+          requests:
+            cpu: 70m
+            memory: 1Gi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - mountPath: /etc/pki/ca-trust/extracted/pem/
+          name: prometheus-trusted-ca-bundle
+          readOnly: true
+        - mountPath: /etc/prometheus/config_out
+          name: config-out
+          readOnly: true
+        - mountPath: /etc/prometheus/certs
+          name: tls-assets
+          readOnly: true
+        - mountPath: /prometheus
+          name: prometheus-k8s-db
+        - mountPath: /etc/prometheus/rules/prometheus-k8s-rulefiles-0
+          name: prometheus-k8s-rulefiles-0
+        - mountPath: /etc/prometheus/secrets/prometheus-k8s-tls
+          name: secret-prometheus-k8s-tls
+          readOnly: true
+        - mountPath: /etc/prometheus/secrets/prometheus-k8s-proxy
+          name: secret-prometheus-k8s-proxy
+          readOnly: true
+        - mountPath: /etc/prometheus/secrets/prometheus-k8s-htpasswd
+          name: secret-prometheus-k8s-htpasswd
+          readOnly: true
+        - mountPath: /etc/prometheus/secrets/kube-rbac-proxy
+          name: secret-kube-rbac-proxy
+          readOnly: true
+        - mountPath: /etc/prometheus/configmaps/serving-certs-ca-bundle
+          name: configmap-serving-certs-ca-bundle
+          readOnly: true
+        - mountPath: /etc/prometheus/configmaps/kubelet-serving-ca-bundle
+          name: configmap-kubelet-serving-ca-bundle
+          readOnly: true
+      - args:
+        - --log-format=logfmt
+        - --reload-url=http://localhost:9090/-/reload
+        - --config-file=/etc/prometheus/config/prometheus.yaml.gz
+        - --config-envsubst-file=/etc/prometheus/config_out/prometheus.env.yaml
+        command:
+        - /bin/prometheus-config-reloader
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        image: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:0e4ca87d6f5b39496df9119ae77ab2b58642cd06f7bdc9bc9c03d8499efb1907
+        imagePullPolicy: IfNotPresent
+        name: prometheus-config-reloader
+        resources:
+          requests:
+            cpu: 1m
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - mountPath: /etc/prometheus/config
+          name: config
+        - mountPath: /etc/prometheus/config_out
+          name: config-out
+      - args:
+        - --webhook-url=http://localhost:9090/-/reload
+        - --volume-dir=/etc/prometheus/rules/prometheus-k8s-rulefiles-0
+        image: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:dfee67ebc8ece9e306e1a02d96523868ca7d0229e66471c85ba4453cc21f8522
+        imagePullPolicy: IfNotPresent
+        name: rules-configmap-reloader
+        resources:
+          requests:
+            cpu: 1m
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - mountPath: /etc/prometheus/rules/prometheus-k8s-rulefiles-0
+          name: prometheus-k8s-rulefiles-0
+      - args:
+        - sidecar
+        - --prometheus.url=http://localhost:9090/
+        - --tsdb.path=/prometheus
+        - --grpc-address=[$(POD_IP)]:10901
+        - --http-address=127.0.0.1:10902
+        - --grpc-server-tls-cert=/etc/tls/grpc/server.crt
+        - --grpc-server-tls-key=/etc/tls/grpc/server.key
+        - --grpc-server-tls-client-ca=/etc/tls/grpc/ca.crt
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.podIP
+        image: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:8a6c975380a356cbebb8284ecfadad6a5b35caaa11fc04956060c95350679f74
+        imagePullPolicy: IfNotPresent
+        name: thanos-sidecar
+        ports:
+        - containerPort: 10902
+          name: http
+          protocol: TCP
+        - containerPort: 10901
+          name: grpc
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 1m
+            memory: 100Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - mountPath: /etc/tls/grpc
+          name: secret-grpc-tls
+        - mountPath: /prometheus
+          name: prometheus-k8s-db
+      - args:
+        - -provider=openshift
+        - -https-address=:9091
+        - -http-address=
+        - -email-domain=*
+        - -upstream=http://localhost:9090
+        - -htpasswd-file=/etc/proxy/htpasswd/auth
+        - -openshift-service-account=prometheus-k8s
+        - '-openshift-sar={"resource": "namespaces", "verb": "get"}'
+        - '-openshift-delegate-urls={"/": {"resource": "namespaces", "verb": "get"}}'
+        - -tls-cert=/etc/tls/private/tls.crt
+        - -tls-key=/etc/tls/private/tls.key
+        - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
+        - -cookie-secret-file=/etc/proxy/secrets/session_secret
+        - -openshift-ca=/etc/pki/tls/cert.pem
+        - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        - -skip-auth-regex=^/metrics
+        env:
+        - name: HTTP_PROXY
+        - name: HTTPS_PROXY
+        - name: NO_PROXY
+        image: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:985230ae8c4c08a2aa64bb0634ad5ede16d87745eabd6ce94f14b22f4576a6ae
+        imagePullPolicy: IfNotPresent
+        name: prometheus-proxy
+        ports:
+        - containerPort: 9091
+          name: web
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 1m
+            memory: 20Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - mountPath: /etc/tls/private
+          name: secret-prometheus-k8s-tls
+        - mountPath: /etc/proxy/secrets
+          name: secret-prometheus-k8s-proxy
+        - mountPath: /etc/proxy/htpasswd
+          name: secret-prometheus-k8s-htpasswd
+        - mountPath: /etc/pki/ca-trust/extracted/pem/
+          name: prometheus-trusted-ca-bundle
+          readOnly: true
+      - args:
+        - --secure-listen-address=0.0.0.0:9092
+        - --upstream=http://127.0.0.1:9095
+        - --config-file=/etc/kube-rbac-proxy/config.yaml
+        - --tls-cert-file=/etc/tls/private/tls.crt
+        - --tls-private-key-file=/etc/tls/private/tls.key
+        - --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256
+        - --logtostderr=true
+        - --v=10
+        image: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:1e32b6a71c6f709b0f1122b4ed77466fbe8fc7c0830b4bce9a90a241312d062d
+        imagePullPolicy: IfNotPresent
+        name: kube-rbac-proxy
+        ports:
+        - containerPort: 9092
+          name: tenancy
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 1m
+            memory: 20Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - mountPath: /etc/tls/private
+          name: secret-prometheus-k8s-tls
+        - mountPath: /etc/kube-rbac-proxy
+          name: secret-kube-rbac-proxy
+      - args:
+        - --insecure-listen-address=127.0.0.1:9095
+        - --upstream=http://127.0.0.1:9090
+        - --label=namespace
+        image: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:2a940f623babafbca11dec05807512327a7195007448642251271bf815751be4
+        imagePullPolicy: IfNotPresent
+        name: prom-label-proxy
+        resources:
+          requests:
+            cpu: 1m
+            memory: 20Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: FallbackToLogsOnError
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        kubernetes.io/os: linux
+      priorityClassName: system-cluster-critical
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: prometheus-k8s
+      serviceAccountName: prometheus-k8s
+      terminationGracePeriodSeconds: 600
+      volumes:
+      - name: config
+        secret:
+          defaultMode: 420
+          secretName: prometheus-k8s
+      - name: tls-assets
+        secret:
+          defaultMode: 420
+          secretName: prometheus-k8s-tls-assets
+      - emptyDir: {}
+        name: config-out
+      - configMap:
+          defaultMode: 420
+          name: prometheus-k8s-rulefiles-0
+        name: prometheus-k8s-rulefiles-0
+      - name: secret-prometheus-k8s-tls
+        secret:
+          defaultMode: 420
+          secretName: prometheus-k8s-tls
+      - name: secret-prometheus-k8s-proxy
+        secret:
+          defaultMode: 420
+          secretName: prometheus-k8s-proxy
+      - name: secret-prometheus-k8s-htpasswd
+        secret:
+          defaultMode: 420
+          secretName: prometheus-k8s-htpasswd
+      - name: secret-kube-rbac-proxy
+        secret:
+          defaultMode: 420
+          secretName: kube-rbac-proxy
+      - configMap:
+          defaultMode: 420
+          name: serving-certs-ca-bundle
+        name: configmap-serving-certs-ca-bundle
+      - configMap:
+          defaultMode: 420
+          name: kubelet-serving-ca-bundle
+        name: configmap-kubelet-serving-ca-bundle
+      - emptyDir: {}
+        name: prometheus-k8s-db
+      - name: secret-grpc-tls
+        secret:
+          defaultMode: 420
+          secretName: prometheus-k8s-grpc-tls-4btarjac7qlvs
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: ca-bundle.crt
+            path: tls-ca-bundle.pem
+          name: prometheus-trusted-ca-bundle-d34s91lhv300e
+          optional: true
+        name: prometheus-trusted-ca-bundle
+  updateStrategy:
+    type: RollingUpdate
