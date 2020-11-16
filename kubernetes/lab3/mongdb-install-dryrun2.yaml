@@ -1,0 +1,450 @@
+NAME: ibmmongodb
+LAST DEPLOYED: Sat Nov 14 17:56:35 2020
+NAMESPACE: default
+STATUS: pending-install
+REVISION: 1
+TEST SUITE: None
+USER-SUPPLIED VALUES:
+auth:
+  database: guestdb
+  password: guestp@ss
+  rootPassword: guest@dmin
+  username: guestuser
+global:
+  namespaceOverride: mongodb
+
+COMPUTED VALUES:
+affinity: {}
+annotations: {}
+arbiter:
+  affinity: {}
+  annotations: {}
+  configuration: ""
+  containerSecurityContext:
+    enabled: true
+    runAsUser: 1001
+  customLivenessProbe: {}
+  customReadinessProbe: {}
+  enabled: true
+  extraEnvVars: []
+  extraFlags: []
+  extraVolumeMounts: []
+  extraVolumes: []
+  initContainers: {}
+  labels: {}
+  livenessProbe:
+    enabled: true
+    failureThreshold: 6
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    successThreshold: 1
+    timeoutSeconds: 5
+  nodeSelector: {}
+  pdb:
+    create: false
+    minAvailable: 1
+  podAnnotations: {}
+  podLabels: {}
+  podSecurityContext:
+    enabled: true
+    fsGroup: 1001
+    sysctls: []
+  readinessProbe:
+    enabled: true
+    failureThreshold: 6
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    successThreshold: 1
+    timeoutSeconds: 5
+  resources:
+    limits: {}
+    requests: {}
+  sidecars: {}
+  tolerations: []
+architecture: standalone
+auth:
+  database: guestdb
+  enabled: true
+  password: guestp@ss
+  replicaSetKey: ""
+  rootPassword: guest@dmin
+  username: guestuser
+clusterDomain: cluster.local
+common:
+  exampleValue: common-chart
+  global:
+    namespaceOverride: mongodb
+    storageClass: ibmc-block-gold
+configuration: ""
+containerSecurityContext:
+  enabled: true
+  runAsNonRoot: true
+  runAsUser: 1001
+customLivenessProbe: {}
+customReadinessProbe: {}
+directoryPerDB: false
+disableSystemLog: false
+enableIPv6: false
+externalAccess:
+  autoDiscovery:
+    enabled: false
+    image:
+      pullPolicy: IfNotPresent
+      pullSecrets: []
+      registry: docker.io
+      repository: bitnami/kubectl
+      tag: 1.18.10-debian-10-r21
+    resources:
+      limits: {}
+      requests: {}
+  enabled: false
+  service:
+    annotations: {}
+    loadBalancerIPs: []
+    loadBalancerSourceRanges: []
+    nodePorts: []
+    port: 27017
+    type: LoadBalancer
+extraEnvVars: []
+extraFlags: []
+extraVolumeMounts: []
+extraVolumes: []
+global:
+  namespaceOverride: mongodb
+  storageClass: ibmc-block-gold
+image:
+  debug: false
+  pullPolicy: IfNotPresent
+  registry: docker.io
+  repository: bitnami/mongodb
+  tag: 4.4.1-debian-10-r61
+initContainers: {}
+initdbScripts: {}
+labels: {}
+livenessProbe:
+  enabled: true
+  failureThreshold: 6
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  successThreshold: 1
+  timeoutSeconds: 5
+metrics:
+  enabled: false
+  extraFlags: ""
+  extraUri: ""
+  image:
+    pullPolicy: IfNotPresent
+    registry: docker.io
+    repository: bitnami/mongodb-exporter
+    tag: 0.11.2-debian-10-r39
+  livenessProbe:
+    enabled: true
+    failureThreshold: 3
+    initialDelaySeconds: 15
+    periodSeconds: 5
+    successThreshold: 1
+    timeoutSeconds: 5
+  prometheusRule:
+    additionalLabels: {}
+    enabled: false
+    rules: {}
+  readinessProbe:
+    enabled: true
+    failureThreshold: 3
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    successThreshold: 1
+    timeoutSeconds: 1
+  resources:
+    limits: {}
+    requests: {}
+  service:
+    annotations:
+      prometheus.io/path: /metrics
+      prometheus.io/port: '{{ .Values.metrics.service.port }}'
+      prometheus.io/scrape: "true"
+    port: 9216
+    type: ClusterIP
+  serviceMonitor:
+    additionalLabels: {}
+    enabled: false
+    interval: 30s
+nodeSelector: {}
+pdb:
+  create: false
+  minAvailable: 1
+persistence:
+  accessModes:
+  - ReadWriteOnce
+  annotations: {}
+  enabled: true
+  mountPath: /bitnami/mongodb
+  size: 8Gi
+  subPath: ""
+podAnnotations: {}
+podLabels: {}
+podManagementPolicy: OrderedReady
+podSecurityContext:
+  enabled: true
+  fsGroup: 1001
+  sysctls: []
+rbac:
+  create: false
+readinessProbe:
+  enabled: true
+  failureThreshold: 6
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  successThreshold: 1
+  timeoutSeconds: 5
+replicaCount: 2
+replicaSetHostnames: true
+replicaSetName: rs0
+resources:
+  limits: {}
+  requests: {}
+service:
+  annotations: {}
+  externalIPs: []
+  loadBalancerSourceRanges: []
+  nodePort: ""
+  port: 27017
+  portName: mongodb
+  type: ClusterIP
+serviceAccount:
+  create: true
+sidecars: {}
+strategyType: RollingUpdate
+systemLogVerbosity: 0
+tls:
+  enabled: false
+  image:
+    pullPolicy: IfNotPresent
+    registry: docker.io
+    repository: bitnami/nginx
+    tag: 1.19.4-debian-10-r13
+tolerations: []
+useStatefulSet: false
+volumePermissions:
+  enabled: false
+  image:
+    pullPolicy: Always
+    pullSecrets: []
+    registry: docker.io
+    repository: bitnami/minideb
+    tag: buster
+  resources:
+    limits: {}
+    requests: {}
+  securityContext:
+    runAsUser: 0
+
+HOOKS:
+MANIFEST:
+---
+# Source: mongodb/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ibmmongodb
+  namespace: mongodb
+  labels:
+    app.kubernetes.io/name: mongodb
+    helm.sh/chart: mongodb-10.0.0
+    app.kubernetes.io/instance: ibmmongodb
+    app.kubernetes.io/managed-by: Helm
+secrets:
+  - name: ibmmongodb
+---
+# Source: mongodb/templates/secrets.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ibmmongodb
+  namespace: mongodb
+  labels:
+    app.kubernetes.io/name: mongodb
+    helm.sh/chart: mongodb-10.0.0
+    app.kubernetes.io/instance: ibmmongodb
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: mongodb
+type: Opaque
+data:
+  mongodb-root-password:  "Z3Vlc3RAZG1pbg=="
+  mongodb-password:  "Z3Vlc3RwQHNz"
+---
+# Source: mongodb/templates/standalone/pvc.yaml
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: ibmmongodb
+  namespace: mongodb
+  labels:
+    app.kubernetes.io/name: mongodb
+    helm.sh/chart: mongodb-10.0.0
+    app.kubernetes.io/instance: ibmmongodb
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: mongodb
+spec:
+  accessModes:
+    - "ReadWriteOnce"
+  resources:
+    requests:
+      storage: "8Gi"
+  storageClassName: ibmc-block-gold
+---
+# Source: mongodb/templates/standalone/svc.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: ibmmongodb
+  namespace: mongodb
+  labels:
+    app.kubernetes.io/name: mongodb
+    helm.sh/chart: mongodb-10.0.0
+    app.kubernetes.io/instance: ibmmongodb
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: mongodb
+spec:
+  type: ClusterIP
+  ports:
+    - name: mongodb
+      port: 27017
+      targetPort: mongodb
+      nodePort: null
+  selector:
+    app.kubernetes.io/name: mongodb
+    app.kubernetes.io/instance: ibmmongodb
+    app.kubernetes.io/component: mongodb
+---
+# Source: mongodb/templates/standalone/dep-sts.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ibmmongodb
+  namespace: mongodb
+  labels:
+    app.kubernetes.io/name: mongodb
+    helm.sh/chart: mongodb-10.0.0
+    app.kubernetes.io/instance: ibmmongodb
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: mongodb
+spec:
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mongodb
+      app.kubernetes.io/instance: ibmmongodb
+      app.kubernetes.io/component: mongodb
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mongodb
+        helm.sh/chart: mongodb-10.0.0
+        app.kubernetes.io/instance: ibmmongodb
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/component: mongodb
+    spec:
+      
+      serviceAccountName: ibmmongodb
+      securityContext:
+        fsGroup: 1001
+        sysctls: []
+      containers:
+        - name: mongodb
+          image: docker.io/bitnami/mongodb:4.4.1-debian-10-r61
+          imagePullPolicy: "IfNotPresent"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+          env:
+            - name: BITNAMI_DEBUG
+              value: "false"
+            - name: MONGODB_USERNAME
+              value: "guestuser"
+            - name: MONGODB_DATABASE
+              value: "guestdb"
+            - name: MONGODB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ibmmongodb
+                  key: mongodb-password
+            - name: MONGODB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ibmmongodb
+                  key: mongodb-root-password
+            - name: ALLOW_EMPTY_PASSWORD
+              value: "no"
+            - name: MONGODB_SYSTEM_LOG_VERBOSITY
+              value: "0"
+            - name: MONGODB_DISABLE_SYSTEM_LOG
+              value: "no"
+            - name: MONGODB_ENABLE_IPV6
+              value: "no"
+            - name: MONGODB_ENABLE_DIRECTORY_PER_DB
+              value: "no"
+          ports:
+            - name: mongodb
+              containerPort: 27017
+          livenessProbe:
+            exec:
+              command:
+                - mongo
+                - --eval
+                - "db.adminCommand('ping')"
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 6
+          readinessProbe:
+            exec:
+              command:
+                - mongo
+                - --eval
+                - "db.adminCommand('ping')"
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 6
+          resources:
+            limits: {}
+            requests: {}
+          volumeMounts:
+            - name: datadir
+              mountPath: /bitnami/mongodb
+              subPath: 
+      volumes:
+        - name: datadir
+          persistentVolumeClaim:
+            claimName: ibmmongodb
+
+NOTES:
+** Please be patient while the chart is being deployed **
+
+MongoDB can be accessed via port 27017 on the following DNS name(s) from within your cluster:
+
+    ibmmongodb.mongodb.svc.cluster.local
+
+To get the root password run:
+
+    export MONGODB_ROOT_PASSWORD=$(kubectl get secret --namespace mongodb ibmmongodb -o jsonpath="{.data.mongodb-root-password}" | base64 --decode)
+
+To get the password for "guestuser" run:
+
+    export MONGODB_PASSWORD=$(kubectl get secret --namespace mongodb ibmmongodb -o jsonpath="{.data.mongodb-password}" | base64 --decode)
+
+To connect to your database, create a MongoDB client container:
+
+    kubectl run --namespace mongodb ibmmongodb-client --rm --tty -i --restart='Never' --image docker.io/bitnami/mongodb:4.4.1-debian-10-r61 --command -- bash
+
+Then, run the following command:
+    mongo admin --host "ibmmongodb" --authenticationDatabase admin -u root -p $MONGODB_ROOT_PASSWORD
+
+To connect to your database from outside the cluster execute the following commands:
+
+    kubectl port-forward --namespace mongodb svc/ibmmongodb 27017:27017 &
+    mongo --host 127.0.0.1 --authenticationDatabase admin -p $MONGODB_ROOT_PASSWORD

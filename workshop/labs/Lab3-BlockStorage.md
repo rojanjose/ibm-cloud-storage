@@ -1,62 +1,58 @@
 
 # Using IBM Cloud Block Storage with Kubernetes
 
+The exercise demonstartes the use of Mongodb with IBM Cloud block storage.
 
-Log into the OpenShift cluster and create a project where we want to deploy Mongodb. Repleace `<username>` with the assigned lab user.
 
-```
-oc new-project mongo-<usename> 
-```
-Expected output:
-```
-$ oc new-project mongo-user001
-
-Now using project "mongo-user001" on server "https://c100-e.us-south.containers.cloud.ibm.com:30817".
-
-You can add applications to this project with the 'new-app' command. For example, try:
-
-    oc new-app ruby~https://github.com/sclorg/ruby-ex.git
-
-to build a new example application in Ruby. Or use kubectl to deploy a simple Kubernetes application:
-
-    kubectl create deployment hello-node --image=gcr.io/hello-minikube-zero-install/hello-node
-```
-
-## Helm Repo setup
-
-The lab uses Bitnami's Mongodb [Helm chart](https://github.com/helm/charts/tree/master/stable/mongodb) to show case the use of block storage. Set the Bitnami helm repo prior to installing mongodb.
-
-```
-helm repo add bitnami https://charts.bitnami.com/bitnami
-```
-Expected output:
-```
-$ helm repo add bitnami https://charts.bitnami.com/bitnami
-
-"bitnami" has been added to your repositories
-```
-Validate the repo is available in the list.
-```
-$ helm repo list
-
-NAME      	URL
-bitnami   	https://charts.bitnami.com/bitnami
-iks-charts	https://icr.io/helm/iks-charts
-```
 
 ## Mongodb with block storage
 
+Create the namespace `mongodb` to for the helm chart to install the database.
+```
+kubectl create -f mongodb-namespace.yaml
+namespace/mongodb created
+```
+
+### Helm Repo setup
+
+Install Block storage plugin
+
+```
+helm repo add iks-charts https://icr.io/helm/iks-charts
+helm repo update
+helm install iks-charts/ibmcloud-block-storage-plugin
+```
+
+Block plugin pods.
+```
+kubectl get pod -n kube-system | grep block
+ibmcloud-block-storage-driver-8j46j                   1/1     Running   0          10m
+ibmcloud-block-storage-driver-bkscq                   1/1     Running   0          10m
+ibmcloud-block-storage-plugin-54cd996d46-qhh75        1/1     Running   0          10m
+```
+
+Block storage class
+```
+kubectl get storageclasses | grep block
+ibmc-block-bronze          ibm.io/ibmc-block   Delete          Immediate           true                   13m
+ibmc-block-custom          ibm.io/ibmc-block   Delete          Immediate           true                   13m
+ibmc-block-gold            ibm.io/ibmc-block   Delete          Immediate           true                   13m
+ibmc-block-retain-bronze   ibm.io/ibmc-block   Retain          Immediate           true                   13m
+ibmc-block-retain-custom   ibm.io/ibmc-block   Retain          Immediate           true                   13m
+ibmc-block-retain-gold     ibm.io/ibmc-block   Retain          Immediate           true                   13m
+ibmc-block-retain-silver   ibm.io/ibmc-block   Retain          Immediate           true                   13m
+ibmc-block-silver          ibm.io/ibmc-block   Delete          Immediate           true                   13m
+```
+
 ### Install manifests
 
-Pick values from [value.yaml](https://raw.githubusercontent.com/helm/charts/master/stable/mongodb/values.yaml)
-Installed in `standalone` mode.
-Dryrun: 
-
-TODO: fix security content values for OpenShift.
+Helm install dry run:
 ```
-helm install mongo bitnami/mongodb --set podSecurityContext.fsGroup=1001020000,containerSecurityContext.runAsUser=1001020000 --debug --dry-run > mongdb-install-dryrun.yaml
-
+helm install ibmmongodb --set global.namespaceOverride=mongodb,auth.rootPassword=guest@dmin,auth.username=guestuser,auth.password=guestp@ss,auth.database=guestdb --debug --dry-run bitnami-ibm/mongodb > mongdb-install-dryrun.yaml
 ```
+
+Review PVC and other parameters in the `mongdb-install-dryrun.yaml` file.
+
 View the output of the command. Review the section that manifests PVC provisioing. 
 Spec list only parameters, Access mode `RWO` and storage size `8gi`.
 Defualt values are assumed for remaining parmeters such as storage class, ... 
@@ -84,83 +80,82 @@ spec:
 
 ### Install Mongodb
 
-TODO: fix security content values for OpenShift.
+Pick values from [value.yaml](https://raw.githubusercontent.com/helm/charts/master/stable/mongodb/values.yaml)
+
+Run the install in standalone mode.
 ```
-helm install mongo bitnami/mongodb --set podSecurityContext.fsGroup=1001020000,containerSecurityContext.runAsUser=1001020000 --debug
+helm install ibmmongodb --set global.namespaceOverride=mongodb,auth.rootPassword=guest@dmin,auth.username=guestuser,auth.password=guestp@ss,auth.database=guestdb bitnami-ibm/mongodb
 ```
 
 Expected output:
 ```
-$ helm install mongo bitnami/mongodb --set podSecurityContext.fsGroup=1001020000,containerSecurityContext.runAsUser=1001020000 --debug
+❯ helm install ibmmongodb --set global.namespaceOverride=mongodb,auth.rootPassword=guest@dmin,auth.username=guestuser,auth.password=guestp@ss,auth.database=guestdb bitnami-ibm/mongodb
 
-install.go:159: [debug] Original chart version: ""
-install.go:176: [debug] CHART PATH: /Users/rojan/Library/Caches/helm/repository/mongodb-9.2.4.tgz
-
-client.go:108: [debug] creating 5 resource(s)
-NAME: mongo
-LAST DEPLOYED: Thu Oct 15 12:49:06 2020
-NAMESPACE: mongo-user001
+NAME: ibmmongodb
+LAST DEPLOYED: Sat Nov 14 18:19:17 2020
+NAMESPACE: default
 STATUS: deployed
 REVISION: 1
 TEST SUITE: None
-USER-SUPPLIED VALUES:
-containerSecurityContext:
-  runAsUser: 1001020000
-podSecurityContext:
-  fsGroup: 1001020000
+NOTES:
+** Please be patient while the chart is being deployed **
 
-......
+MongoDB can be accessed via port 27017 on the following DNS name(s) from within your cluster:
+
+    ibmmongodb.mongodb.svc.cluster.local
+
+To get the root password run:
+
+    export MONGODB_ROOT_PASSWORD=$(kubectl get secret --namespace mongodb ibmmongodb -o jsonpath="{.data.mongodb-root-password}" | base64 --decode)
+
+To get the password for "guestuser" run:
+
+    export MONGODB_PASSWORD=$(kubectl get secret --namespace mongodb ibmmongodb -o jsonpath="{.data.mongodb-password}" | base64 --decode)
+
+To connect to your database, create a MongoDB client container:
+
+    kubectl run --namespace mongodb ibmmongodb-client --rm --tty -i --restart='Never' --image docker.io/bitnami/mongodb:4.4.1-debian-10-r61 --command -- bash
+
+Then, run the following command:
+    mongo admin --host "ibmmongodb" --authenticationDatabase admin -u root -p $MONGODB_ROOT_PASSWORD
+
+To connect to your database from outside the cluster execute the following commands:
+
+    kubectl port-forward --namespace mongodb svc/ibmmongodb 27017:27017 &
+    mongo --host 127.0.0.1 --authenticationDatabase admin -p $MONGODB_ROOT_PASSWORD
 
 ```
 
 View the objects being created by the helm chart.
 
 ```
-$ oc get all 
-NAME                    TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)     AGE
-service/mongo-mongodb   ClusterIP   172.21.242.70   <none>        27017/TCP   17s
+❯ kubectl get all -n mongodb
+NAME                              READY   STATUS    RESTARTS   AGE
+pod/ibmmongodb-7db76c6567-mkj2l   1/1     Running   0          2m48s
 
-NAME                            READY   UP-TO-DATE   AVAILABLE   AGE
-deployment.apps/mongo-mongodb   0/1     0            0           17s
+NAME                 TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)     AGE
+service/ibmmongodb   ClusterIP   172.21.125.115   <none>        27017/TCP   2m49s
 
-NAME                                       DESIRED   CURRENT   READY   AGE
-replicaset.apps/mongo-mongodb-6f8f7cd789   1         0         0       17s
+NAME                         READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/ibmmongodb   1/1     1            1           2m48s
+
+NAME                                    DESIRED   CURRENT   READY   AGE
+replicaset.apps/ibmmongodb-7db76c6567   1         1         1       2m48s
 ```
 
-View the list of persistence volume claims. Note that the `mongo-mongodb` is pending volume allocation.
-
+View the list of persistence volume claims. 
 ```
-$ oc get pvc    
-
-NAME            STATUS    VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS      AGE
-mongo-mongodb   Pending                                      ibmc-block-gold   21s
+$ kubectl get pvc -n mongodb
+NAME         STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS      AGE
+ibmmongodb   Bound    pvc-1e82b3a7-ba42-46f5-a9df-21d8c7e28cf2   20Gi       RWO            ibmc-block-gold   91m
 ```
 
-After waiting for some time. The pod supporting Mongodb is in `Running` status.
-
+PV used by this PVC
 ```
-$ oc get all       
-NAME                                 READY   STATUS    RESTARTS   AGE
-pod/mongo-mongodb-66d7bcd7cf-vqvbj   1/1     Running   0          8m37s
-
-NAME                    TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)     AGE
-service/mongo-mongodb   ClusterIP   172.21.242.70   <none>        27017/TCP   12m
-
-NAME                            READY   UP-TO-DATE   AVAILABLE   AGE
-deployment.apps/mongo-mongodb   1/1     1            1           12m
-
-NAME                                       DESIRED   CURRENT   READY   AGE
-replicaset.apps/mongo-mongodb-66d7bcd7cf   1         1         1       8m37s
-replicaset.apps/mongo-mongodb-6f8f7cd789   0         0         0       12m
+kubectl get pv pvc-1e82b3a7-ba42-46f5-a9df-21d8c7e28cf2
+NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM                STORAGECLASS   REASON   AGE
+pvc-1e82b3a7-ba42-46f5-a9df-21d8c7e28cf2   20Gi       RWO            Delete           Bound    mongodb/ibmmongodb                           91m
 ```
-
-And the PVC `mongo-mongodb` is now bound to volume `pvc-2f423668-4f87-4ae4-8edf-8c892188b645`
-```
-$ oc get pvc 
-NAME            STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS      AGE
-mongo-mongodb   Bound    pvc-2f423668-4f87-4ae4-8edf-8c892188b645   20Gi       RWO            ibmc-block-gold   2m26s
-```
-
 
 ## Accessing data
 
@@ -189,6 +184,85 @@ To connect to your database from outside the cluster execute the following comma
     kubectl port-forward --namespace mongo-user001 svc/mongo-mongodb 27017:27017 &
     mongo --host 127.0.0.1 --authenticationDatabase admin -p $MONGODB_ROOT_PASSWORD
 
+
+Forward the port:
+```
+❯ kubectl port-forward --namespace mongodb svc/ibmmongodb 27017:27017 &
+[1] 40848
+Forwarding from 127.0.0.1:27017 -> 27017
+Forwarding from [::1]:27017 -> 27017
+```
+
+
+Login using mongo client pod running on Kubernetes:
+
+```
+kubectl run --namespace mongodb ibmmongodb-client --rm --tty -i --restart='Never' --image docker.io/bitnami/mongodb:4.4.1-debian-10-r61 --command -- bash
+If you don't see a command prompt, try pressing enter.
+I have no name!@ibmmongodb-client:/$ mongo --version
+MongoDB shell version v4.4.1
+Build Info: {
+    "version": "4.4.1",
+    "gitVersion": "ad91a93a5a31e175f5cbf8c69561e788bbc55ce1",
+    "openSSLVersion": "OpenSSL 1.1.1d  10 Sep 2019",
+    "modules": [],
+    "allocator": "tcmalloc",
+    "environment": {
+        "distmod": "debian10",
+        "distarch": "x86_64",
+        "target_arch": "x86_64"
+    }
+}
+I have no name!@ibmmongodb-client:/$
+I have no name!@ibmmongodb-client:/$ mongo admin --host "ibmmongodb" --authenticationDatabase admin -u root -p guest@dmin
+MongoDB shell version v4.4.1
+connecting to: mongodb://ibmmongodb:27017/admin?authSource=admin&compressors=disabled&gssapiServiceName=mongodb
+Implicit session: session { "id" : UUID("c9aa6aab-354d-4bd7-a56f-84a401d689f7") }
+MongoDB server version: 4.4.1
+---
+The server generated these startup warnings when booting:
+        2020-11-15T03:11:02.936+00:00: ***** SERVER RESTARTED *****
+        2020-11-15T03:11:02.943+00:00: Using the XFS filesystem is strongly recommended with the WiredTiger storage engine. See http://dochub.mongodb.org/core/prodnotes-filesystem
+---
+---
+        Enable MongoDB's free cloud-based monitoring service, which will then receive and display
+        metrics about your deployment (disk utilization, CPU, operation statistics, etc).
+
+        The monitoring data will be available on a MongoDB website with a unique URL accessible to you
+        and anyone you share the URL with. MongoDB may use this information to make product
+        improvements and to suggest MongoDB products and deployment options to you.
+
+        To enable free monitoring, run the following command: db.enableFreeMonitoring()
+        To permanently disable this reminder, run the following command: db.disableFreeMonitoring()
+---
+> db.guestbook.find()
+>
+> use guestbookdb
+switched to db guestbookdb
+> db.guestbook.find()
+>
+> db.createCollection("guestbook")
+{ "ok" : 1 }
+>
+> db.guestbook.insertOne({"1":"Hello Kubernetes!"})
+{
+	"acknowledged" : true,
+	"insertedId" : ObjectId("5fb09fa83d5e7bdd0f09f80b")
+}
+> db.guestbook.insertOne({"2":"Hola Kubernetes!"})
+{
+	"acknowledged" : true,
+	"insertedId" : ObjectId("5fb09fb73d5e7bdd0f09f80c")
+}
+>
+> db.guestbook.find()
+{ "_id" : ObjectId("5fb09fa83d5e7bdd0f09f80b"), "1" : "Hello Kubernetes!" }
+{ "_id" : ObjectId("5fb09fb73d5e7bdd0f09f80c"), "2" : "Hola Kubernetes!" }
+>
+>
+> exit
+
+```
 
 ### For cluster
 

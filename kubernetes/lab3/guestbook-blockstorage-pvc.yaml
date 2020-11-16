@@ -1,0 +1,19 @@
+# Source: mongodb/templates/standalone/pvc.yaml
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: ibmmongodb
+  namespace: mongodb
+  labels:
+    app.kubernetes.io/name: mongodb
+    helm.sh/chart: mongodb-10.0.0
+    app.kubernetes.io/instance: ibmmongodb
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: mongodb
+spec:
+  accessModes:
+    - "ReadWriteOnce"
+  resources:
+    requests:
+      storage: "8Gi"
+  storageClassName: ibmc-block-gold
